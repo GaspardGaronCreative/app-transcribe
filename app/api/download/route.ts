@@ -103,6 +103,8 @@ export async function POST(request: NextRequest) {
                     fileSize: finalSize,
                     mimeType: contentType,
                     status: "COMPLETED",
+                    platform,
+                    originalUrl: body.url,
                 },
             });
 
@@ -162,6 +164,8 @@ export async function POST(request: NextRequest) {
                     fileSize: finalSize,
                     mimeType: contentType,
                     status: "COMPLETED",
+                    platform,
+                    originalUrl: body.url,
                 },
             });
 

@@ -3,89 +3,41 @@
 import { useState } from "react";
 import { VideoDownloader } from "@/components/video-downloader";
 import { VideoList } from "@/components/video-list";
-import { Toaster } from "@/components/ui/sonner";
 
 export default function Home() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const appName = process.env.NEXT_PUBLIC_APP_NAME || "app-transcribe";
 
   const handleDownloadComplete = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
 
   return (
-    <>
-      <div className="min-h-screen bg-background">
-        {/* Header */}
-        <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-lg bg-foreground flex items-center justify-center">
-                  <VideoIcon className="h-5 w-5 text-background" />
-                </div>
-                <h1 className="text-xl font-semibold">{appName}</h1>
-              </div>
-              <nav className="flex items-center gap-4">
-                <a
-                  href="/api/health"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Health
-                </a>
-                <a
-                  href="http://localhost:9003"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  Storage
-                </a>
-              </nav>
+    <main className="flex h-screen w-full bg-white font-sans overflow-hidden">
+      {/* Left Sidebar - Clean White */}
+      <aside className="w-[320px] flex-shrink-0 h-full bg-white z-10 flex flex-col">
+        {/* Logo / Brand Area */}
+        <div className="px-6 pt-8 pb-2">
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Maison Egard</h1>
+        </div>
+
+        {/* Downloader Component */}
+        <div className="flex-1 overflow-hidden">
+          <VideoDownloader onDownloadComplete={handleDownloadComplete} />
+        </div>
+      </aside>
+
+      {/* Main Content - Grey Card Container */}
+      <section className="flex-1 h-full p-4 pl-0">
+        <div className="h-full w-full bg-[#F5F5F7] rounded-[22px] overflow-hidden flex flex-col relative">
+
+          {/* Scrollable Grid Area */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-[1800px] mx-auto pb-10">
+              <VideoList refreshTrigger={refreshTrigger} />
             </div>
           </div>
-        </header>
-
-        {/* Main Content */}
-        <main className="container mx-auto px-4 py-8">
-          <div className="max-w-2xl mx-auto space-y-8">
-            {/* Hero */}
-            <div className="text-center space-y-2">
-              <h2 className="text-3xl font-bold tracking-tight">
-                Download Videos
-              </h2>
-              <p className="text-muted-foreground">
-                Save videos from YouTube, TikTok, Instagram, and LinkedIn
-              </p>
-            </div>
-
-            {/* Downloader */}
-            <VideoDownloader onDownloadComplete={handleDownloadComplete} />
-
-            {/* Video List */}
-            <VideoList refreshTrigger={refreshTrigger} />
-          </div>
-        </main>
-
-        {/* Footer */}
-        <footer className="border-t mt-16">
-          <div className="container mx-auto px-4 py-6">
-            <p className="text-center text-sm text-muted-foreground">
-              Built with Next.js 15 • PostgreSQL • MinIO • Cobalt
-            </p>
-          </div>
-        </footer>
-      </div>
-      <Toaster />
-    </>
-  );
-}
-
-function VideoIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polygon points="23 7 16 12 23 17 23 7" />
-      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-    </svg>
+        </div>
+      </section>
+    </main>
   );
 }

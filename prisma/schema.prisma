@@ -26,6 +26,9 @@ model Video {
   fileSize    Int      // Size in bytes
   mimeType    String   // e.g., "video/mp4"
   duration    Int?     // Duration in seconds (optional)
+  platform    String?  // Source platform (e.g. YouTube, TikTok)
+  originalUrl String?  // Original URL of the video
+  niche       String?  // Video niche/category
   
   // Status tracking
   status      VideoStatus @default(PENDING)

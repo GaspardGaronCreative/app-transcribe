@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
+import { Loader2, Video, Trash2, X } from "lucide-react";
+import { VideoCard } from "@/components/video-card";
 
-interface Video {
+interface VideoData {
     id: string;
     title: string;
     description: string | null;
@@ -19,6 +17,9 @@ interface Video {
     status: string;
     createdAt: string;
     downloadUrl: string | null;
+    platform: string | null;
+    originalUrl: string | null;
+    niche: string | null;
 }
 
 interface VideoListProps {
@@ -26,9 +27,12 @@ interface VideoListProps {
 }
 
 export function VideoList({ refreshTrigger }: VideoListProps) {
-    const [videos, setVideos] = useState<Video[]>([]);
+    const [videos, setVideos] = useState<VideoData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
+    const [isGlobalMuted, setIsGlobalMuted] = useState(true); // Default muted
+
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, videoId: string } | null>(null);
 
     const fetchVideos = async () => {
         try {
@@ -48,215 +52,126 @@ export function VideoList({ refreshTrigger }: VideoListProps) {
         fetchVideos();
     }, [refreshTrigger]);
 
+    // Close menu on global click/scroll
+    useEffect(() => {
+        const closeMenu = () => setContextMenu(null);
+        window.addEventListener("click", closeMenu);
+        window.addEventListener("scroll", closeMenu, true); // true for capture (scroll inside div)
+        return () => {
+            window.removeEventListener("click", closeMenu);
+            window.removeEventListener("scroll", closeMenu, true);
+        };
+    }, []);
+
     const handleDelete = async (id: string) => {
+
         try {
+            // Optimistic update
+            setVideos((prev) => prev.filter((v) => v.id !== id));
+            toast.success("Video deleted");
+
             const response = await fetch(`/api/videos?id=${id}`, {
                 method: "DELETE",
             });
 
-            if (!response.ok) {
-                throw new Error("Delete failed");
-            }
+            if (!response.ok) throw new Error("Delete failed");
 
-            toast.success("Video deleted");
-            setVideos((prev) => prev.filter((v) => v.id !== id));
-            if (playingVideoId === id) {
-                setPlayingVideoId(null);
-            }
         } catch {
             toast.error("Failed to delete video");
+            // Re-fetch to revert if failed (optional, but good for MVP)
+            fetchVideos();
         }
     };
 
-    const togglePlay = (id: string) => {
-        setPlayingVideoId(playingVideoId === id ? null : id);
+    const toggleMute = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsGlobalMuted(!isGlobalMuted);
     };
 
-    const formatFileSize = (bytes: number): string => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-        return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-    };
-
-    const formatDate = (dateString: string): string => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
+    const handleContextMenu = (e: React.MouseEvent, videoId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            videoId
         });
+    };
+
+    const handleDownload = (e: React.MouseEvent, video: VideoData) => {
+        e.stopPropagation();
+        if (!video.downloadUrl) return;
+        const link = document.createElement("a");
+        link.href = video.downloadUrl;
+        link.download = video.fileName;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     if (isLoading) {
         return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Downloaded Videos</CardTitle>
-                    <CardDescription>Your downloaded videos will appear here</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex items-center justify-center py-8 text-muted-foreground">
-                        Loading...
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="flex items-center justify-center py-20 text-slate-400">
+                <Loader2 className="h-8 w-8 animate-spin mr-2" />
+                <span>Loading library...</span>
+            </div>
         );
     }
 
     if (videos.length === 0) {
         return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Downloaded Videos</CardTitle>
-                    <CardDescription>Your downloaded videos will appear here</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                        <VideoIcon className="h-12 w-12 mb-4 opacity-50" />
-                        <p>No videos yet</p>
-                        <p className="text-sm">Download a video to get started</p>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <Video className="h-16 w-16 mb-4 opacity-20" />
+                <p>No videos downloaded yet</p>
+                <p className="text-sm">Use the sidebar to upload links</p>
+            </div>
         );
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Downloaded Videos</CardTitle>
-                <CardDescription>{videos.length} video{videos.length !== 1 ? "s" : ""}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {videos.map((video, index) => (
-                    <div key={video.id}>
-                        {index > 0 && <Separator className="my-4" />}
-
-                        {/* Video Player */}
-                        {playingVideoId === video.id && video.downloadUrl && (
-                            <div className="mb-4 rounded-lg overflow-hidden bg-black">
-                                <video
-                                    src={video.downloadUrl}
-                                    controls
-                                    autoPlay
-                                    className="w-full max-h-[400px]"
-                                    onError={() => {
-                                        toast.error("Failed to load video");
-                                        setPlayingVideoId(null);
-                                    }}
-                                >
-                                    Your browser does not support the video tag.
-                                </video>
-                            </div>
-                        )}
-
-                        <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                                <h4 className="font-medium truncate">{video.title}</h4>
-                                <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                                    <Badge variant="secondary" className="text-xs">
-                                        {formatFileSize(video.fileSize)}
-                                    </Badge>
-                                    <span>{formatDate(video.createdAt)}</span>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                {/* Play/Stop Button */}
-                                {video.downloadUrl && (
-                                    <Button
-                                        variant={playingVideoId === video.id ? "default" : "outline"}
-                                        size="sm"
-                                        onClick={() => togglePlay(video.id)}
-                                    >
-                                        {playingVideoId === video.id ? (
-                                            <>
-                                                <StopIcon className="h-4 w-4 mr-1" />
-                                                Stop
-                                            </>
-                                        ) : (
-                                            <>
-                                                <PlayIcon className="h-4 w-4 mr-1" />
-                                                Play
-                                            </>
-                                        )}
-                                    </Button>
-                                )}
-                                {/* Download Button */}
-                                {video.downloadUrl && (
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        asChild
-                                    >
-                                        <a href={video.downloadUrl} download={video.fileName} target="_blank" rel="noopener noreferrer">
-                                            <DownloadIcon className="h-4 w-4 mr-1" />
-                                            Download
-                                        </a>
-                                    </Button>
-                                )}
-                                {/* Delete Button */}
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDelete(video.id)}
-                                    className="text-destructive hover:text-destructive"
-                                >
-                                    <TrashIcon className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
+        <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-8">
+                {videos.map((video) => (
+                    <VideoCard
+                        key={video.id}
+                        video={video}
+                        isGlobalMuted={isGlobalMuted}
+                        onToggleMute={toggleMute}
+                        onDelete={handleDelete}
+                        onContextMenu={handleContextMenu}
+                        onDownload={handleDownload}
+                    />
                 ))}
-            </CardContent>
-        </Card>
-    );
-}
+            </div>
 
-// Icons
-function VideoIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polygon points="23 7 16 12 23 17 23 7" />
-            <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
-        </svg>
-    );
-}
-
-function PlayIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polygon points="5 3 19 12 5 21 5 3" />
-        </svg>
-    );
-}
-
-function StopIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-        </svg>
-    );
-}
-
-function DownloadIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-        </svg>
-    );
-}
-
-function TrashIcon({ className }: { className?: string }) {
-    return (
-        <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            <line x1="10" y1="11" x2="10" y2="17" />
-            <line x1="14" y1="11" x2="14" y2="17" />
-        </svg>
+            {/* Global Context Menu Overlay (Portal-like) */}
+            {contextMenu && (
+                <div
+                    className="fixed z-50 bg-white/90 backdrop-blur-md border border-slate-200 rounded-lg p-1.5 min-w-[140px] animate-in fade-in zoom-in-95 duration-100 origin-top-left"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                    onClick={(e) => e.stopPropagation()} // Prevent closing when clicking menu itself
+                >
+                    <div className="text-xs font-medium text-slate-400 px-2 py-1 mb-1 border-b border-slate-100">
+                        Options
+                    </div>
+                    <button
+                        onClick={() => { handleDelete(contextMenu.videoId); setContextMenu(null); }}
+                        className="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-md text-left transition-colors font-medium"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                    </button>
+                    <button
+                        onClick={() => setContextMenu(null)}
+                        className="flex items-center gap-2 w-full px-2 py-1.5 text-sm text-slate-500 hover:bg-slate-50 rounded-md text-left transition-colors mt-0.5"
+                    >
+                        <X className="h-4 w-4" />
+                        Cancel
+                    </button>
+                </div>
+            )}
+        </>
     );
 }
