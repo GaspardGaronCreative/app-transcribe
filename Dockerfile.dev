@@ -3,8 +3,8 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies for native modules
-RUN apk add --no-cache libc6-compat
+# Install dependencies for native modules and FFmpeg for video compression
+RUN apk add --no-cache libc6-compat ffmpeg
 
 # Copy package files
 COPY package.json package-lock.json* ./

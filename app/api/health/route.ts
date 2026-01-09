@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { checkStorageHealth } from "@/lib/storage";
+import { checkCobaltHealth } from "@/lib/cobalt";
+import { checkFFmpegAvailable } from "@/lib/compress";
 
 export const dynamic = "force-dynamic";
 
@@ -15,16 +17,21 @@ interface HealthStatus {
         storage: {
             status: "connected" | "disconnected";
         };
+        cobalt: {
+            status: "connected" | "disconnected";
+        };
+        ffmpeg: {
+            status: "available" | "unavailable";
+        };
     };
     app: {
         name: string;
         environment: string;
+        compression: boolean;
     };
 }
 
 export async function GET() {
-    const startTime = Date.now();
-
     // Check database connection
     let dbStatus: "connected" | "disconnected" = "disconnected";
     let dbLatency: number | undefined;
@@ -48,6 +55,26 @@ export async function GET() {
         console.error("Storage health check failed:", error);
     }
 
+    // Check Cobalt connection
+    let cobaltStatus: "connected" | "disconnected" = "disconnected";
+
+    try {
+        const isHealthy = await checkCobaltHealth();
+        cobaltStatus = isHealthy ? "connected" : "disconnected";
+    } catch (error) {
+        console.error("Cobalt health check failed:", error);
+    }
+
+    // Check FFmpeg availability
+    let ffmpegStatus: "available" | "unavailable" = "unavailable";
+
+    try {
+        const isAvailable = await checkFFmpegAvailable();
+        ffmpegStatus = isAvailable ? "available" : "unavailable";
+    } catch (error) {
+        console.error("FFmpeg check failed:", error);
+    }
+
     // Determine overall health
     const isHealthy = dbStatus === "connected" && storageStatus === "connected";
 
@@ -62,10 +89,17 @@ export async function GET() {
             storage: {
                 status: storageStatus,
             },
+            cobalt: {
+                status: cobaltStatus,
+            },
+            ffmpeg: {
+                status: ffmpegStatus,
+            },
         },
         app: {
             name: process.env.NEXT_PUBLIC_APP_NAME || "app-transcribe",
             environment: process.env.NODE_ENV || "development",
+            compression: process.env.VIDEO_COMPRESSION_ENABLED !== "false",
         },
     };
 

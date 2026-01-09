@@ -1,6 +1,6 @@
 # app-transcribe
 
-A modern video transcription platform built with Next.js 15, PostgreSQL, and MinIO.
+A modern video download and transcription platform built with Next.js 15, PostgreSQL, MinIO, and Cobalt.
 
 ## 🚀 Quick Start
 
@@ -27,12 +27,13 @@ docker compose up -d
 
 ### Access the Services
 
-| Service           | URL                         | Description              |
-| ----------------- | --------------------------- | ------------------------ |
-| **Next.js App**   | http://localhost:3000       | Main application         |
-| **Health Check**  | http://localhost:3000/api/health | Service status API  |
-| **MinIO Console** | http://localhost:9001       | Storage management UI    |
-| **PostgreSQL**    | localhost:5432              | Database (use DB client) |
+| Service           | URL                          | Description              |
+| ----------------- | ---------------------------- | ------------------------ |
+| **Next.js App**   | http://localhost:3000        | Main application         |
+| **Health Check**  | http://localhost:3000/api/health | Service status API   |
+| **MinIO Console** | http://localhost:9003        | Storage management UI    |
+| **Cobalt API**    | http://localhost:9000        | Video download service   |
+| **PostgreSQL**    | localhost:5432               | Database (use DB client) |
 
 ### MinIO Console Login
 
@@ -45,12 +46,20 @@ docker compose up -d
 app-transcribe/
 ├── app/                    # Next.js App Router
 │   ├── api/
-│   │   └── health/        # Health check endpoint
+│   │   ├── download/      # Video download endpoint
+│   │   ├── health/        # Health check endpoint
+│   │   └── videos/        # Video management endpoint
 │   ├── layout.tsx         # Root layout
 │   └── page.tsx           # Home page
+├── components/
+│   ├── ui/                # shadcn/ui components
+│   ├── video-downloader.tsx  # Download form
+│   └── video-list.tsx     # Video gallery
 ├── lib/
 │   ├── db.ts              # Prisma database client
-│   └── storage.ts         # MinIO/S3 storage utilities
+│   ├── storage.ts         # MinIO/S3 storage utilities
+│   ├── cobalt.ts          # Cobalt API client
+│   └── utils.ts           # shadcn/ui utilities
 ├── prisma/
 │   └── schema.prisma      # Database schema
 ├── docker-compose.yml     # Production setup
@@ -58,6 +67,17 @@ app-transcribe/
 ├── Dockerfile             # Production build
 └── Dockerfile.dev         # Development build
 ```
+
+## 🎬 Supported Platforms
+
+The app supports downloading videos from:
+
+- **YouTube** - Videos, Shorts
+- **TikTok** - Videos
+- **Instagram** - Reels, Posts
+- **LinkedIn** - Video posts
+- **Twitter/X** - Videos, GIFs
+- **Vimeo** - Videos
 
 ## 🔧 Renaming the Application
 
@@ -108,6 +128,7 @@ docker compose logs -f
 docker compose logs -f app
 docker compose logs -f postgres
 docker compose logs -f minio
+docker compose logs -f cobalt
 
 # Run database migrations
 docker compose exec app npx prisma migrate dev
@@ -153,6 +174,15 @@ S3_SECRET_KEY=your-secret-key
 S3_BUCKET=your-bucket-name
 S3_REGION=your-region
 ```
+
+## 🎥 Video Downloader (Cobalt)
+
+The app uses [Cobalt](https://github.com/imputnet/cobalt) for downloading videos. Cobalt is:
+
+- **Privacy-focused** - No tracking or ads
+- **Self-hosted** - Runs in your Docker environment
+- **High quality** - Supports up to 8K resolution
+- **Fast** - Efficient streaming and processing
 
 ## 🚢 Production Deployment
 
@@ -202,6 +232,9 @@ Response:
     },
     "storage": {
       "status": "connected"
+    },
+    "cobalt": {
+      "status": "connected"
     }
   },
   "app": {
@@ -209,6 +242,30 @@ Response:
     "environment": "development"
   }
 }
+```
+
+### Download Video
+
+```bash
+POST /api/download
+Content-Type: application/json
+
+{
+  "url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  "videoQuality": "1080"
+}
+```
+
+### List Videos
+
+```bash
+GET /api/videos
+```
+
+### Delete Video
+
+```bash
+DELETE /api/videos?id=video_id
 ```
 
 ## 🐛 Troubleshooting
@@ -243,7 +300,17 @@ The `minio-setup` container automatically creates the bucket. If it fails:
 
 ```bash
 # Manually create bucket via MinIO Console
-# Go to http://localhost:9001 and create "videos" bucket
+# Go to http://localhost:9003 and create "videos" bucket
+```
+
+### Cobalt download fails
+
+```bash
+# Check Cobalt logs
+docker compose logs cobalt
+
+# Verify Cobalt is responding
+curl http://localhost:9000/
 ```
 
 ## 📄 License

@@ -18,11 +18,12 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_secret_change_me}@postgres:5432/${POSTGRES_DB:-app_transcribe}?schema=public
-      - S3_ENDPOINT=http://minio:9000
+      - S3_ENDPOINT=http://minio:9002
       - S3_ACCESS_KEY=${MINIO_ROOT_USER:-minioadmin}
       - S3_SECRET_KEY=${MINIO_ROOT_PASSWORD:-minio_secret_change_me}
       - S3_BUCKET=${MINIO_BUCKET:-videos}
       - S3_REGION=us-east-1
+      - COBALT_API_URL=http://cobalt:9000
       - NEXT_PUBLIC_APP_NAME=${APP_NAME:-app-transcribe}
       - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
     depends_on:
@@ -30,6 +31,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+      cobalt:
+        condition: service_started
     networks:
       - app-network
 
@@ -59,22 +62,23 @@ services:
 
   # ===========================================
   # MinIO (S3-compatible Object Storage)
+  # Port 9002 for API, 9003 for Console
   # ===========================================
   minio:
     image: minio/minio:latest
     container_name: ${APP_NAME:-app-transcribe}-minio
     restart: unless-stopped
-    command: server /data --console-address ":9001"
+    command: server /data --address ":9002" --console-address ":9003"
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minioadmin}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minio_secret_change_me}
     volumes:
       - minio_data:/data
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${MINIO_PORT:-9002}:9002"
+      - "${MINIO_CONSOLE_PORT:-9003}:9003"
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-f", "http://localhost:9002/minio/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -93,11 +97,28 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minio_secret_change_me};
+      mc alias set myminio http://minio:9002 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minio_secret_change_me};
       mc mb myminio/${MINIO_BUCKET:-videos} --ignore-existing;
       mc anonymous set download myminio/${MINIO_BUCKET:-videos};
       exit 0;
       "
+    networks:
+      - app-network
+
+  # ===========================================
+  # Cobalt (Video Downloader API)
+  # Supports: YouTube, TikTok, Instagram, LinkedIn, etc.
+  # ===========================================
+  cobalt:
+    image: ghcr.io/imputnet/cobalt:11
+    container_name: ${APP_NAME:-app-transcribe}-cobalt
+    restart: unless-stopped
+    init: true
+    read_only: true
+    ports:
+      - "9000:9000"
+    environment:
+      - API_URL=${COBALT_API_URL:-http://localhost:9000/}
     networks:
       - app-network
 

@@ -8,9 +8,20 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-// S3/MinIO client configuration
+// Internal S3/MinIO client (for server-side operations within Docker network)
 const s3Client = new S3Client({
-    endpoint: process.env.S3_ENDPOINT || "http://minio:9000",
+    endpoint: process.env.S3_ENDPOINT || "http://minio:9002",
+    region: process.env.S3_REGION || "us-east-1",
+    credentials: {
+        accessKeyId: process.env.S3_ACCESS_KEY || "minioadmin",
+        secretAccessKey: process.env.S3_SECRET_KEY || "minio_secret_change_me",
+    },
+    forcePathStyle: true, // Required for MinIO
+});
+
+// Public S3/MinIO client (for generating browser-accessible URLs)
+const s3PublicClient = new S3Client({
+    endpoint: process.env.S3_PUBLIC_ENDPOINT || "http://localhost:9002",
     region: process.env.S3_REGION || "us-east-1",
     credentials: {
         accessKeyId: process.env.S3_ACCESS_KEY || "minioadmin",
@@ -72,7 +83,8 @@ export async function getFile(key: string) {
 }
 
 /**
- * Generate a signed URL for downloading a file
+ * Generate a signed URL for downloading/streaming a file
+ * Uses the public endpoint so URLs work in the browser
  * @param key - The object key in storage
  * @param expiresIn - Expiration time in seconds (default: 1 hour)
  */
@@ -85,7 +97,8 @@ export async function getSignedDownloadUrl(
         Key: key,
     });
 
-    return await getSignedUrl(s3Client, command, { expiresIn });
+    // Use public client for browser-accessible URLs
+    return await getSignedUrl(s3PublicClient, command, { expiresIn });
 }
 
 /**
@@ -105,7 +118,8 @@ export async function getSignedUploadUrl(
         ContentType: contentType,
     });
 
-    return await getSignedUrl(s3Client, command, { expiresIn });
+    // Use public client for browser-accessible URLs
+    return await getSignedUrl(s3PublicClient, command, { expiresIn });
 }
 
 /**
@@ -146,4 +160,4 @@ export function generateFileKey(originalFileName: string): string {
     return `videos/${timestamp}-${randomString}.${extension}`;
 }
 
-export { s3Client, BUCKET };
+export { s3Client, s3PublicClient, BUCKET };
