@@ -1,0 +1,46 @@
+// Prisma Schema for app-transcribe
+// To rename the app, update the database name in your .env file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===========================================
+// Video Model - Stores metadata for uploaded videos
+// ===========================================
+model Video {
+  id          String   @id @default(cuid())
+  
+  // Video metadata
+  title       String
+  description String?
+  
+  // Storage information
+  fileName    String   // Original file name
+  fileKey     String   @unique // S3/MinIO object key
+  fileSize    Int      // Size in bytes
+  mimeType    String   // e.g., "video/mp4"
+  duration    Int?     // Duration in seconds (optional)
+  
+  // Status tracking
+  status      VideoStatus @default(PENDING)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum VideoStatus {
+  PENDING      // Just uploaded, not processed
+  PROCESSING   // Being transcribed/processed
+  COMPLETED    // Processing complete
+  FAILED       // Processing failed
+}

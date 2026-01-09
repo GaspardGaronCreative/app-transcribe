@@ -1,36 +1,251 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# app-transcribe
 
-## Getting Started
+A modern video transcription platform built with Next.js 15, PostgreSQL, and MinIO.
 
-First, run the development server:
+## 🚀 Quick Start
+
+### Prerequisites
+
+- [Docker](https://www.docker.com/get-started) installed and running
+- [Docker Compose](https://docs.docker.com/compose/) (included with Docker Desktop)
+
+### Start the Application
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Clone and navigate to the project
+cd app-transcribe
+
+# Copy environment file
+cp .env.example .env.local
+
+# Start all services (development mode with hot reload)
+docker compose up
+
+# Or start in background
+docker compose up -d
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Access the Services
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Service           | URL                         | Description              |
+| ----------------- | --------------------------- | ------------------------ |
+| **Next.js App**   | http://localhost:3000       | Main application         |
+| **Health Check**  | http://localhost:3000/api/health | Service status API  |
+| **MinIO Console** | http://localhost:9001       | Storage management UI    |
+| **PostgreSQL**    | localhost:5432              | Database (use DB client) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### MinIO Console Login
 
-## Learn More
+- **Username**: `minioadmin`
+- **Password**: `minio_secret_change_me`
 
-To learn more about Next.js, take a look at the following resources:
+## 📁 Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+app-transcribe/
+├── app/                    # Next.js App Router
+│   ├── api/
+│   │   └── health/        # Health check endpoint
+│   ├── layout.tsx         # Root layout
+│   └── page.tsx           # Home page
+├── lib/
+│   ├── db.ts              # Prisma database client
+│   └── storage.ts         # MinIO/S3 storage utilities
+├── prisma/
+│   └── schema.prisma      # Database schema
+├── docker-compose.yml     # Production setup
+├── docker-compose.override.yml  # Dev overrides
+├── Dockerfile             # Production build
+└── Dockerfile.dev         # Development build
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 🔧 Renaming the Application
 
-## Deploy on Vercel
+To rename the app from `app-transcribe` to your desired name:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **Update `.env.local`**:
+   ```env
+   APP_NAME=your-new-app-name
+   NEXT_PUBLIC_APP_NAME=your-new-app-name
+   POSTGRES_DB=your_new_db_name
+   ```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+2. **Update `package.json`**:
+   ```json
+   {
+     "name": "your-new-app-name"
+   }
+   ```
+
+3. **Restart containers to apply changes**:
+   ```bash
+   docker compose down -v  # Remove old volumes if needed
+   docker compose up
+   ```
+
+## 📦 Common Commands
+
+```bash
+# Start services (development)
+docker compose up
+
+# Start services (production)
+docker compose -f docker-compose.yml up
+
+# Stop services
+docker compose down
+
+# Stop and remove volumes (fresh start)
+docker compose down -v
+
+# Rebuild containers after code changes
+docker compose up --build
+
+# View logs
+docker compose logs -f
+
+# View specific service logs
+docker compose logs -f app
+docker compose logs -f postgres
+docker compose logs -f minio
+
+# Run database migrations
+docker compose exec app npx prisma migrate dev
+
+# Open Prisma Studio (database GUI)
+docker compose exec app npx prisma studio
+```
+
+## 🗄️ Database Management
+
+### Run Migrations
+
+```bash
+# Create a new migration
+docker compose exec app npx prisma migrate dev --name your_migration_name
+
+# Apply migrations in production
+docker compose exec app npx prisma migrate deploy
+```
+
+### Prisma Studio
+
+```bash
+# Launch database GUI
+docker compose exec app npx prisma studio
+```
+
+## 📤 Storage (MinIO/S3)
+
+The application uses MinIO for S3-compatible object storage. In production, you can easily switch to:
+
+- **AWS S3**
+- **Cloudflare R2**
+- **DigitalOcean Spaces**
+- **Any S3-compatible storage**
+
+Just update the environment variables:
+
+```env
+S3_ENDPOINT=https://your-s3-endpoint.com
+S3_ACCESS_KEY=your-access-key
+S3_SECRET_KEY=your-secret-key
+S3_BUCKET=your-bucket-name
+S3_REGION=your-region
+```
+
+## 🚢 Production Deployment
+
+### Docker (Standalone)
+
+```bash
+# Build and run production containers
+docker compose -f docker-compose.yml up -d --build
+```
+
+### Cloud Deployment
+
+The Docker setup is compatible with:
+
+- **Railway** - Import repo, it auto-detects Docker
+- **Render** - Use the Docker deployment option
+- **DigitalOcean App Platform** - Deploy from Dockerfile
+- **AWS ECS** - Push images to ECR
+- **Google Cloud Run** - Deploy container image
+
+### Environment Variables for Production
+
+Make sure to set secure passwords:
+
+```env
+POSTGRES_PASSWORD=generate-a-strong-password
+MINIO_ROOT_PASSWORD=generate-a-strong-password
+```
+
+## 📝 API Reference
+
+### Health Check
+
+```bash
+GET /api/health
+```
+
+Response:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2025-01-09T12:00:00.000Z",
+  "services": {
+    "database": {
+      "status": "connected",
+      "latency": 5
+    },
+    "storage": {
+      "status": "connected"
+    }
+  },
+  "app": {
+    "name": "app-transcribe",
+    "environment": "development"
+  }
+}
+```
+
+## 🐛 Troubleshooting
+
+### Containers won't start
+
+```bash
+# Check Docker is running
+docker info
+
+# Check logs for errors
+docker compose logs
+
+# Rebuild from scratch
+docker compose down -v
+docker compose up --build
+```
+
+### Database connection issues
+
+```bash
+# Verify PostgreSQL is healthy
+docker compose ps
+
+# Check PostgreSQL logs
+docker compose logs postgres
+```
+
+### MinIO bucket not created
+
+The `minio-setup` container automatically creates the bucket. If it fails:
+
+```bash
+# Manually create bucket via MinIO Console
+# Go to http://localhost:9001 and create "videos" bucket
+```
+
+## 📄 License
+
+MIT
